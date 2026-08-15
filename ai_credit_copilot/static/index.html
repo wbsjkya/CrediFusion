@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f5f1">
+  <title>CrediFusion AI 信贷分析工作台</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div>
+          <p class="eyebrow">CREDIFUSION / REVIEW LAYER</p>
+          <h1>AI 信贷分析工作台</h1>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="connection" id="connectionStatus" aria-live="polite">
+          <span class="connection-dot"></span>
+          <span id="connectionText">正在检查 Qwen 接口</span>
+        </div>
+        <button class="quiet-button" id="loadDemoButton" type="button">载入样例</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="case-panel" aria-labelledby="case-heading">
+        <div class="panel-title-row">
+          <div>
+            <p class="section-kicker">CASE CONTEXT</p>
+            <h2 id="case-heading">模型摘要</h2>
+          </div>
+          <span class="case-state" id="caseState">草稿</span>
+        </div>
+
+        <form id="caseForm" novalidate>
+          <label class="field-label" for="caseId">案件引用</label>
+          <input class="text-field" id="caseId" name="caseId" maxlength="64" value="CASE-2026-0081" autocomplete="off">
+
+          <div class="score-label-row">
+            <label class="field-label" for="scoreRange">CrediFusion 风险概率</label>
+            <output id="scoreValue" for="scoreRange">72%</output>
+          </div>
+          <input class="score-range" id="scoreRange" type="range" min="0.01" max="0.99" step="0.01" value="0.72">
+          <div class="score-scale"><span>0</span><span>1.0</span></div>
+
+          <div class="two-column-fields">
+            <div>
+              <label class="field-label" for="partyCount">参与方</label>
+              <select class="select-field" id="partyCount">
+                <option value="2">2 方</option>
+                <option value="3">3 方</option>
+                <option value="4">4 方</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label" for="alignmentRate">对齐率</label>
+              <input class="text-field compact" id="alignmentRate" inputmode="decimal" value="0.96" maxlength="5">
+            </div>
+          </div>
+
+          <div class="two-column-fields">
+            <div>
+              <label class="field-label" for="coverageRate">特征覆盖</label>
+              <input class="text-field compact" id="coverageRate" inputmode="decimal" value="0.91" maxlength="5">
+            </div>
+            <div>
+              <label class="field-label" for="modelVersion">模型版本</label>
+              <input class="text-field compact" id="modelVersion" value="credit-demo-2026.08" maxlength="80" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="evidence-heading">
+            <label class="field-label">聚合风险证据</label>
+            <button class="icon-button" id="addEvidenceButton" type="button" aria-label="添加证据" title="添加证据">+</button>
+          </div>
+          <div id="evidenceList" class="evidence-list"></div>
+
+          <label class="field-label" for="dataQuality">数据质量备注</label>
+          <textarea class="text-area" id="dataQuality" rows="3" maxlength="80">aggregated signals complete; manual document verification pending</textarea>
+
+          <button class="primary-action" id="analyzeButton" type="submit">
+            <span>生成审查意见</span>
+            <span class="button-arrow" aria-hidden="true">→</span>
+          </button>
+        </form>
+      </aside>
+
+      <section class="review-panel" aria-labelledby="review-heading">
+        <div class="review-header">
+          <div>
+            <p class="section-kicker">HUMAN REVIEW</p>
+            <h2 id="review-heading">审查意见</h2>
+          </div>
+          <div class="review-meta" id="reviewMeta">等待模型响应</div>
+        </div>
+
+        <div class="review-empty" id="analysisEmpty">
+          <div class="empty-score">--</div>
+          <p>尚未生成审查意见</p>
+        </div>
+
+        <div id="analysisResult" class="analysis-result" hidden>
+          <section class="score-overview" aria-label="模型信号概览">
+            <div>
+              <p class="metric-label">联邦模型风险信号</p>
+              <div class="score-number" id="resultScore">72%</div>
+              <p class="score-footnote" id="scoreFootnote">模型信号，需人工复核</p>
+            </div>
+            <div class="signal-block">
+              <p class="metric-label">风险区间</p>
+              <div class="band-label" id="riskBand">高关注</div>
+              <div class="band-scale" aria-hidden="true"><span></span><span></span><span></span></div>
+            </div>
+          </section>
+
+          <section class="analysis-section">
+            <p class="metric-label">审查摘要</p>
+            <p class="summary-copy" id="analysisSummary"></p>
+          </section>
+
+          <section class="analysis-section">
+            <div class="section-heading-row">
+              <p class="metric-label">关键审查信号</p>
+              <span class="count-label" id="factorCount"></span>
+            </div>
+            <div class="factor-list" id="factorList"></div>
+          </section>
+
+          <div class="analysis-columns">
+            <section class="analysis-section compact-section">
+              <p class="metric-label">可缓释事项</p>
+              <ul class="review-list" id="mitigantList"></ul>
+            </section>
+            <section class="analysis-section compact-section">
+              <p class="metric-label">人工核验问题</p>
+              <ul class="review-list" id="questionList"></ul>
+            </section>
+          </div>
+
+          <section class="analysis-section limitation-section">
+            <p class="metric-label">边界与限制</p>
+            <ul class="review-list" id="limitationList"></ul>
+            <p class="compliance-note" id="complianceNote"></p>
+          </section>
+
+          <details class="source-output">
+            <summary>查看模型原始输出</summary>
+            <pre id="rawOutput"></pre>
+          </details>
+        </div>
+      </section>
+
+      <aside class="trace-panel" aria-labelledby="trace-heading">
+        <div>
+          <p class="section-kicker">CONTROL PLANE</p>
+          <h2 id="trace-heading">模型链路</h2>
+        </div>
+
+        <ol class="pipeline-list">
+          <li>
+            <span class="pipeline-index">01</span>
+            <div>
+              <strong>CrediFusion</strong>
+              <p>联邦风险概率与聚合证据</p>
+            </div>
+          </li>
+          <li>
+            <span class="pipeline-index">02</span>
+            <div>
+              <strong>最小化上下文</strong>
+              <p id="privacySummary">仅白名单字段进入外部接口</p>
+            </div>
+          </li>
+          <li>
+            <span class="pipeline-index">03</span>
+            <div>
+              <strong id="qwenModelName">Qwen3.5</strong>
+              <p>生成可复核的审查辅助意见</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="audit-block">
+          <p class="metric-label">审计状态</p>
+          <dl>
+            <div><dt>外发字段</dt><dd>聚合摘要</dd></div>
+            <div><dt>直接标识符</dt><dd>不发送</dd></div>
+            <div><dt>决策权限</dt><dd>人工复核</dd></div>
+          </dl>
+        </div>
+      </aside>
+    </main>
+
+    <section class="chat-dock" aria-labelledby="chat-heading">
+      <div class="chat-title">
+        <p class="section-kicker">CASE FOLLOW-UP</p>
+        <h2 id="chat-heading">向 Qwen 追问</h2>
+      </div>
+      <div class="chat-content">
+        <div class="chat-log" id="chatLog" aria-live="polite">
+          <p class="chat-placeholder">等待审查员问题</p>
+        </div>
+        <form class="chat-form" id="chatForm">
+          <input class="chat-input" id="chatQuestion" maxlength="1600" autocomplete="off" placeholder="例如：需要人工核验哪些材料？">
+          <button class="send-button" id="sendButton" type="submit" aria-label="发送问题" title="发送问题">→</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

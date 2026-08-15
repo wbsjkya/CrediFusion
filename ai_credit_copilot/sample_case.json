@@ -1,0 +1,34 @@
+{
+  "case": {
+    "case_id": "CASE-2026-0081",
+    "model_score": 0.72,
+    "model_name": "CrediFusion",
+    "model_version": "credit-demo-2026.08",
+    "data_quality": "aggregated signals complete; manual document verification pending",
+    "federation": {
+      "party_count": 2,
+      "alignment_rate": 0.96,
+      "feature_coverage": 0.91
+    },
+    "evidence": [
+      {
+        "label": "近期还款波动",
+        "impact": "up",
+        "value": "近 6 个月存在 2 次逾期信号，需人工核验原因与更正记录",
+        "confidence": 0.86
+      },
+      {
+        "label": "债务负担变化",
+        "impact": "up",
+        "value": "聚合后的债务收入比处于规则关注区间",
+        "confidence": 0.79
+      },
+      {
+        "label": "现金流稳定性",
+        "impact": "down",
+        "value": "已观察到连续的收入流入模式，仍需核验数据覆盖期",
+        "confidence": 0.73
+      }
+    ]
+  }
+}
