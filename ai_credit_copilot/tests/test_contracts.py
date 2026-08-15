@@ -1,6 +1,11 @@
 import unittest
 
-from ai_credit_copilot.contracts import InputValidationError, SafeCase, risk_band
+from ai_credit_copilot.contracts import (
+    InputValidationError,
+    SafeCase,
+    redact_sensitive_text,
+    risk_band,
+)
 
 
 def sample_payload():
@@ -39,11 +44,50 @@ class SafeCaseTest(unittest.TestCase):
         self.assertIn("evidence[0].id_number", safe_case.discarded_fields)
         self.assertIn("federation.raw_feature_dump", safe_case.discarded_fields)
 
-    def test_internal_case_reference_is_required(self):
+    def test_direct_identifiers_are_rejected_as_case_references(self):
+        for case_id in (
+            "customer@example.com",
+            "13812345678",
+            "CASE-13812345678",
+            "CASE-138-1234-5678",
+            "110101199001011234",
+            "CASE-110101199001011234",
+        ):
+            with self.subTest(case_id=case_id):
+                payload = sample_payload()
+                payload["case_id"] = case_id
+                with self.assertRaises(InputValidationError):
+                    SafeCase.from_payload(payload)
+
+    def test_allowed_metadata_fields_are_redacted(self):
         payload = sample_payload()
-        payload["case_id"] = "customer@example.com"
-        with self.assertRaises(InputValidationError):
-            SafeCase.from_payload(payload)
+        payload["model_name"] = "owner customer@example.com"
+        payload["model_version"] = "contact +86 138-1234-5678"
+        payload["data_quality"] = "record 110101199001011234"
+
+        prompt_payload = SafeCase.from_payload(payload).prompt_payload()
+
+        self.assertEqual(
+            prompt_payload["federated_model"]["name"], "owner [redacted-email]"
+        )
+        self.assertEqual(
+            prompt_payload["federated_model"]["version"], "contact [redacted-mobile]"
+        )
+        self.assertEqual(prompt_payload["data_quality"], "record [redacted-id]")
+
+    def test_common_mobile_number_formats_are_redacted(self):
+        for mobile in (
+            "13812345678",
+            "138-1234-5678",
+            "138 1234 5678",
+            "+86 13812345678",
+            "0086-138-1234-5678",
+        ):
+            with self.subTest(mobile=mobile):
+                self.assertEqual(
+                    redact_sensitive_text("contact " + mobile),
+                    "contact [redacted-mobile]",
+                )
 
     def test_risk_band_boundaries(self):
         self.assertEqual(risk_band(0.39), "low")

@@ -10,7 +10,9 @@ class InputValidationError(ValueError):
 
 
 _CASE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$")
-_MOBILE_PATTERN = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
+_MOBILE_PATTERN = re.compile(
+    r"(?<!\d)(?:(?:\+|00)86[\s-]?)?1[3-9]\d(?:[\s-]?\d){8}(?!\d)"
+)
 _ID_CARD_PATTERN = re.compile(r"(?<!\d)\d{17}[0-9Xx](?!\d)")
 _EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
@@ -95,13 +97,24 @@ class SafeCase:
 
         discarded_fields = sorted(str(key) for key in payload if key not in _CASE_ALLOWLIST)
         case_id = _text(payload.get("case_id"), "case_id", 64)
-        if not _CASE_ID_PATTERN.match(case_id):
-            raise InputValidationError("case_id must be an internal, non-identifying reference")
+        if (
+            not _CASE_ID_PATTERN.match(case_id)
+            or redact_sensitive_text(case_id) != case_id
+        ):
+            raise InputValidationError(
+                "case_id must be an internal, non-identifying reference"
+            )
 
         score = _number(payload.get("model_score"), "model_score", 0.0, 1.0)
-        model_name = _text(payload.get("model_name", "CrediFusion"), "model_name", 80)
-        model_version = _text(payload.get("model_version", "unspecified"), "model_version", 80)
-        data_quality = _text(payload.get("data_quality", "not_provided"), "data_quality", 80)
+        model_name = redact_sensitive_text(
+            _text(payload.get("model_name", "CrediFusion"), "model_name", 80)
+        )
+        model_version = redact_sensitive_text(
+            _text(payload.get("model_version", "unspecified"), "model_version", 80)
+        )
+        data_quality = redact_sensitive_text(
+            _text(payload.get("data_quality", "not_provided"), "data_quality", 80)
+        )
         reviewer_context = redact_sensitive_text(
             _text(payload.get("reviewer_context", ""), "reviewer_context", 600, required=False)
         )
